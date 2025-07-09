@@ -1,10 +1,23 @@
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nohemi</title>
+
+    <!-- Social Share Meta Tags -->
+    <meta property="og:title" content="Nohemi - Des Muda" />
+    <meta property="og:description" content="Escucha el nuevo álbum &quot;Des Muda&quot; de Nohemi. Cantante solista de folklore de Presidencia Roque Sáenz Peña, Chaco." />
+    <meta property="og:image" content="https://ia600900.us.archive.org/17/items/luis_20250625/004.jpg" />
+    <meta property="og:url" content="https://formatog.github.io/desmuda/" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Nohemi - Des Muda" />
+    <meta name="twitter:description" content="Escucha el nuevo álbum &quot;Des Muda&quot; de Nohemi. Cantante solista de folklore de Presidencia Roque Sáenz Peña, Chaco." />
+    <meta name="twitter:image" content="https://ia600900.us.archive.org/17/items/luis_20250625/004.jpg" />
+
     <link rel="icon" href="https://ia600900.us.archive.org/17/items/luis_20250625/004.jpg" />
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -53,8 +66,8 @@
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client"
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/client": "https://esm.sh/react-dom@^19.1.0/client"
   }
 }
 </script>
@@ -90,13 +103,14 @@
       };
       
       const newAlbumArt = 'https://ia600900.us.archive.org/17/items/luis_20250625/004.jpg';
+      const elCuervoAlbumArt = 'https://dn721502.ca.archive.org/0/items/luis_20250625/005.jpg';
       const TRACK_DATA = [
-          { id: 1, title: 'Boleto de salida', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/01%20-%20Boleto%20de%20salida.mp3' },
-          { id: 2, title: 'Sin miedo a decirte', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/02%20-%20Sin%20miedo%20a%20decirte.mp3' },
-          { id: 3, title: 'La sombra de un cuento', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/05%20-%20La%20sombra%20de%20un%20cuento.mp3' },
-          { id: 4, title: 'Cicatrices de papel', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/06%20-%20Cicatrices%20de%20papel.mp3' },
-          { id: 5, title: 'Me hablaron de canciones', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/09%20-%20Me%20hablaron%20de%20canciones%20.mp3' },
-          { id: 6, title: 'El cuervo y el espejo feat Coda', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/10%20-%20El%20cuervo%20y%20el%20espejo%20con%20Coda.mp3' },
+          { id: 1, title: 'Boleto de salida', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://res.cloudinary.com/dz25se1yc/video/upload/v1752040738/lbwcl0u1chhwou0mucly.mp3' },
+          { id: 2, title: 'Sin miedo a decirte', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://res.cloudinary.com/dz25se1yc/video/upload/v1752040744/tz7j624bibmkepxbki08.mp3' },
+          { id: 3, title: 'La sombra de un cuento', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://res.cloudinary.com/dz25se1yc/video/upload/v1752040748/ky8jvvqy4ihduwoubxnc.mp3' },
+          { id: 4, title: 'Cicatrices de papel', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://res.cloudinary.com/dz25se1yc/video/upload/v1752040748/bhhnl5fa0hwqbqfajquu.mp3' },
+          { id: 5, title: 'Me hablaron de canciones', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://res.cloudinary.com/dz25se1yc/video/upload/v1752040748/bbijnsux7tce7ziflejd.mp3' },
+          { id: 6, title: 'El cuervo y el espejo feat Coda', artist: 'Nohemi', duration: '0:00', albumArt: elCuervoAlbumArt, available: true, audioSrc: 'https://res.cloudinary.com/dz25se1yc/video/upload/v1752040752/oyx7yih4cnyqjr7ciwa8.mp3' },
       ];
       // --- END OF constants.ts ---
 
@@ -233,7 +247,7 @@
       const ArtistInfo = ({ artist, currentTrack, isPlaying }) => {
         const [showShareOptions, setShowShareOptions] = useState(false);
         const shareContainerRef = useRef(null);
-        const shareUrl = "https://sites.google.com/view/desmuda/nohemi";
+        const shareUrl = "https://formatog.github.io/desmuda/";
 
         const handleShareClick = () => {
           setShowShareOptions(prev => !prev);
@@ -251,12 +265,12 @@
           };
         }, []);
 
-        let albumArtUrl = artist.avatarUrl;
+        const albumArtUrl = currentTrack ? currentTrack.albumArt : artist.avatarUrl;
 
         return React.createElement('div', { className: "flex flex-col items-center text-center lg:items-start lg:text-left" },
           React.createElement('img', {
             src: albumArtUrl,
-            alt: artist.name,
+            alt: currentTrack ? currentTrack.title : artist.name,
             className: "w-48 h-48 lg:w-full lg:h-auto object-cover aspect-square mb-4 shadow-lg rounded-md"
           }),
           React.createElement(AlbumInfo, { artist: artist, currentTrack: currentTrack, isPlaying: isPlaying }),
@@ -743,7 +757,7 @@
           ),
           React.createElement(FullScreenContentOverlay, null),
           React.createElement('div', { className: "flex-shrink-0", style: { height: `calc(6rem + env(safe-area-inset-bottom))` } }),
-          React.createElement('audio', { ref: audioRef, preload: "metadata", crossOrigin: "anonymous" }),
+          React.createElement('audio', { ref: audioRef, preload: "auto", crossOrigin: "anonymous" }),
           React.createElement(PlayerControls, {
             currentTrack: currentTrack,
             isPlaying: isPlaying,
