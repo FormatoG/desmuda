@@ -53,15 +53,725 @@
 <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.1.0/",
-    "react": "https://esm.sh/react@^19.1.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.1.0/"
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client"
   }
 }
 </script>
 </head>
 <body class="bg-black">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module">
+      import React from 'react';
+      import ReactDOM from 'react-dom/client';
+
+      const { useState, useCallback, useRef, useEffect } = React;
+      
+      // --- START OF constants.ts ---
+      const ARTIST_DATA = {
+        name: 'Nohemi',
+        verified: false,
+        followers: '12,3K',
+        trackCount: 6,
+        avatarUrl: 'https://ia600900.us.archive.org/17/items/luis_20250625/004.jpg',
+        bioImageUrl: 'https://scontent.fgpo1-1.fna.fbcdn.net/v/t39.30808-6/468393350_10234420887814188_4343900435238788932_n.jpg?_nc_cat=100&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=pGaagvpTiJ8Q7kNvwGi3Ftw&_nc_oc=AdmBnazr8I2Toshl0owEHjAJPJIKig2-SqHWpLxz6tpCQ7GOxpmhXO5UhTUFDVFwETI&_nc_zt=23&_nc_ht=scontent.fgpo1-1.fna&_nc_gid=2ZkWwQ47tpg-NAFeae8TNQ&oh=00_AfPl804UI-6gB61EpFeBQ11Yq_t6RBrFO8b93yICZK1zxA&oe=686D3361',
+        albumName: 'Des Muda',
+        releaseYear: '2025',
+        bio: 'Nohemi es cantante solista de folklore y profesora de vocalización de la ciudad de Presidencia Roque Sáenz Peña en la provincia del Chaco. Con una voz profunda y auténtica, combina la fuerza del canto tradicional con una calidez cercana que conecta con su público. Participa activamente en festivales y encuentros culturales, y también comparte su pasión por la música enseñando a nuevas generaciones. En cada escenario, Nohemi transmite raíces, identidad y emoción.',
+        contact: {
+          email: 'nohemi.musica@gmail.com',
+          phone: '+54 9 364 412 3456',
+        },
+        support: {
+          text: 'Si te gusta mi música y querés apoyar mi proyecto, podés colaborar invitándome un "Cafecito". Tu aporte me ayuda a seguir creando y compartiendo nuevas canciones.',
+          link: 'https://cafecito.app/nohemi',
+          qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=192x192&data=https://cafecito.app/nohemi',
+        },
+      };
+      
+      const newAlbumArt = 'https://ia600900.us.archive.org/17/items/luis_20250625/004.jpg';
+      const TRACK_DATA = [
+          { id: 1, title: 'Boleto de salida', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/01%20-%20Boleto%20de%20salida.mp3' },
+          { id: 2, title: 'Sin miedo a decirte', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/02%20-%20Sin%20miedo%20a%20decirte.mp3' },
+          { id: 3, title: 'La sombra de un cuento', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/05%20-%20La%20sombra%20de%20un%20cuento.mp3' },
+          { id: 4, title: 'Cicatrices de papel', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/06%20-%20Cicatrices%20de%20papel.mp3' },
+          { id: 5, title: 'Me hablaron de canciones', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/09%20-%20Me%20hablaron%20de%20canciones%20.mp3' },
+          { id: 6, title: 'El cuervo y el espejo feat Coda', artist: 'Nohemi', duration: '0:00', albumArt: newAlbumArt, available: true, audioSrc: 'https://archive.org/download/desmuda_202506/10%20-%20El%20cuervo%20y%20el%20espejo%20con%20Coda.mp3' },
+      ];
+      // --- END OF constants.ts ---
+
+      // --- START OF lib/offline.ts ---
+      const CACHE_NAME = 'rhythmstream-offline-audio-v1';
+      const OFFLINE_TRACKS_KEY = 'rhythmstream-offline-track-ids';
+      const getOfflineTrackIds = () => {
+        try {
+          const stored = localStorage.getItem(OFFLINE_TRACKS_KEY);
+          return stored ? new Set(JSON.parse(stored)) : new Set();
+        } catch (error) {
+          console.error("Failed to parse offline tracks from localStorage", error);
+          return new Set();
+        }
+      };
+      const saveOfflineTrackIds = (ids) => {
+        localStorage.setItem(OFFLINE_TRACKS_KEY, JSON.stringify(Array.from(ids)));
+      };
+      const saveTrackForOffline = async (track) => {
+        if (!track.audioSrc) throw new Error('Track has no audio source.');
+        const cache = await caches.open(CACHE_NAME);
+        await cache.add(track.audioSrc);
+        const currentIds = getOfflineTrackIds();
+        currentIds.add(track.id);
+        saveOfflineTrackIds(currentIds);
+      };
+      const removeTrackFromOffline = async (track) => {
+         if (!track.audioSrc) return;
+         const cache = await caches.open(CACHE_NAME);
+         await cache.delete(track.audioSrc);
+         const currentIds = getOfflineTrackIds();
+         currentIds.delete(track.id);
+         saveOfflineTrackIds(currentIds);
+      };
+      const getOfflineAudio = async (audioSrc) => {
+        if (!audioSrc) return undefined;
+        const cache = await caches.open(CACHE_NAME);
+        return await cache.match(audioSrc);
+      };
+      // --- END OF lib/offline.ts ---
+
+      // --- START OF components/Icon.tsx ---
+      const Icon = ({ name, className = 'w-6 h-6' }) => {
+        const icons = {
+          play: React.createElement('path', { d: "M6 4l12 8-12 8V4z" }),
+          pause: React.createElement('path', { d: "M6 4h4v16H6zM14 4h4v16h-4z" }),
+          next: React.createElement('path', { d: "M6 4l12 8-12 8V4zM18 4h2v16h-2z" }),
+          previous: React.createElement('path', { d: "M18 20L6 12l12-8v16zM4 4h2v16H4z" }),
+          stop: React.createElement('path', { d: "M6 6h12v12H6z" }),
+          shuffle: React.createElement('path', { fillRule: "evenodd", clipRule: "evenodd", d: "M18.364 4.636a1 1 0 00-1.414 0L12 9.586 7.05 4.636a1 1 0 10-1.414 1.414L10.586 11l-4.95 4.95a1 1 0 101.414 1.414L12 12.414l4.95 4.95a1 1 0 101.414-1.414L13.414 11l4.95-4.95a1 1 0 000-1.414zM4.636 5.636L9.586 10.586l-4.95 4.95" }),
+          repeat: React.createElement('path', { d: "M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" }),
+          volume: React.createElement('path', { d: "M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" }),
+          verified: React.createElement('path', { fillRule: "evenodd", clipRule: "evenodd", d: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.03 15.41l-4.5-4.5 1.41-1.41 3.09 3.08 7.09-7.08 1.41 1.41-8.5 8.5z" }),
+          followers: React.createElement('path', { d: "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" }),
+          tracks: React.createElement('path', { d: "M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" }),
+          location: React.createElement('path', { d: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z" }),
+          share: React.createElement('path', { d: "M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"}),
+          plus: React.createElement('path', { d: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"}),
+          dots: React.createElement('path', { d: "M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"}),
+          facebook: React.createElement('path', { d: "M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" }),
+          instagram: React.createElement('path', { d: "M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2zm-.2 2A3.6 3.6 0 0 0 4 7.6v8.8A3.6 3.6 0 0 0 7.6 20h8.8A3.6 3.6 0 0 0 20 16.4V7.6A3.6 3.6 0 0 0 16.4 4H7.6zm9.65 1.5a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" }),
+          youtube: React.createElement('path', { d: "M21.58,7.19C21.35,6.3,20.7,5.65,19.81,5.42C18.25,5,12,5,12,5s-6.25,0-7.81,0.42C3.3,5.65,2.65,6.3,2.42,7.19C2,8.75,2,12,2,12s0,3.25,0.42,4.81c0.23,0.89,0.88,1.54,1.77,1.77C5.75,19,12,19,12,19s6.25,0,7.81-0.42c0.89-0.23,1.54-0.88,1.77-1.77C22,15.25,22,12,22,12S22,8.75,21.58,7.19z M9.86,15.93V8.07l6.83,3.93L9.86,15.93z"}),
+          whatsapp: React.createElement('path', { d: "M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.79.46 3.48 1.32 4.95L2 22l5.25-1.38c1.41.79 3.02 1.22 4.79 1.22 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zM12.04 20.13c-1.54 0-3.02-.39-4.32-1.1L4.5 20.25l1.24-3.13c-.83-1.34-1.28-2.88-1.28-4.51 0-4.53 3.69-8.21 8.22-8.21 4.53 0 8.21 3.68 8.21 8.21s-3.68 8.21-8.21 8.21zm4.52-6.13c-.24-.12-1.45-.72-1.68-.8s-.39-.12-.55.12c-.16.24-.63.8-.78.96-.14.16-.29.18-.53.06s-1.03-.38-1.95-1.2c-.72-.64-1.2-1.44-1.34-1.68-.14-.24-.01-.37.11-.48.11-.11.24-.29.36-.43.12-.14.16-.24.24-.4s.12-.29 0-.41c-.08-.12-.55-1.32-.76-1.81s-.41-.41-.55-.41-.29-.01-.44-.01c-.16 0-.41.06-.63.3s-.87.85-.87 2.07c0 1.22.89 2.4 1.01 2.56.12.16 1.76 2.68 4.27 3.75 2.5 1.06 2.5.71 2.95.69.45-.02 1.45-.59 1.65-1.15s.2-1.07.14-1.15c-.06-.09-.23-.15-.48-.27z" }),
+          eye: React.createElement('path', { d: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zm11 0a3 3 0 100-6 3 3 0 000 6z" }),
+          download: React.createElement('path', { d: "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"}),
+          check: React.createElement('path', { d: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"}),
+          loader: React.createElement('path', { d: "M12 4V2A10 10 0 002 12h2a8 8 0 018-8z" }),
+          mail: React.createElement('path', { d: "M22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6zm-2 0l-8 5-8-5h16zm0 12H4V8l8 5 8-5v10z" }),
+          heart: React.createElement('path', { d: "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"}),
+        };
+        return React.createElement('svg', {
+          xmlns: "http://www.w3.org/2000/svg",
+          viewBox: "0 0 24 24",
+          fill: "currentColor",
+          className: className,
+          'aria-hidden': "true",
+        }, icons[name] || React.createElement('path', { d: "M0 0h24v24H0z", fill: "none" }));
+      };
+      // --- END OF components/Icon.tsx ---
+
+      // --- START OF components/DesktopHeader.tsx ---
+      const DesktopHeader = ({ artist, currentTrack, isPlaying }) => {
+        const COVER_PHOTO_URL = 'https://ia600902.us.archive.org/32/items/fondo-nuevo/fondo%20nuevo.jpg';
+        return React.createElement('div', { className: "hidden lg:block relative w-full h-40 text-white rounded-t-lg overflow-hidden" },
+          React.createElement('img', {
+            src: COVER_PHOTO_URL,
+            alt: `${artist.name}'s cover image`,
+            className: "absolute inset-0 w-full h-full object-cover object-center",
+          }),
+          React.createElement('div', { className: "absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" }),
+          React.createElement('div', { className: "absolute bottom-0 left-0 p-4 flex flex-col justify-end h-full w-full" },
+            artist.verified && React.createElement('div', { className: "flex items-center gap-2 mb-1" },
+              React.createElement(Icon, { name: "verified", className: "w-6 h-6 text-blue-400" }),
+              React.createElement('span', { className: "font-semibold text-sm" }, "Artista verificado")
+            ),
+            isPlaying && currentTrack && React.createElement('h2', { className: "text-xl font-semibold text-white mb-1 tracking-tight animate-pulse truncate", style: { textShadow: '1px 1px 5px rgba(0,0,0,0.7)' } },
+              currentTrack.title
+            ),
+            React.createElement('h1', { className: "text-5xl font-bold tracking-tight", style: { textShadow: '2px 2px 8px rgba(0,0,0,0.8)' } },
+              artist.name
+            ),
+            React.createElement('p', { className: "mt-1 text-base text-gray-300" },
+              `${artist.albumName} - ${artist.releaseYear}`
+            )
+          )
+        );
+      };
+      // --- END OF components/DesktopHeader.tsx ---
+
+      // --- START OF components/AlbumInfo.tsx ---
+      const AlbumInfo = ({ artist, currentTrack, isPlaying }) => {
+        return React.createElement('div', { className: "w-full my-4" },
+          React.createElement('div', { className: "lg:hidden text-center" },
+            currentTrack && isPlaying ? React.createElement(React.Fragment, null,
+              React.createElement('h2', { className: "text-lg font-semibold text-white truncate", title: currentTrack.title },
+                currentTrack.title
+              ),
+              React.createElement('p', { className: "text-sm text-gray-400" }, `${artist.name} - ${artist.albumName}`)
+            ) : React.createElement('div', { className: "text-gray-400 italic text-center" },
+              React.createElement('p', null, "La música"),
+              React.createElement('p', null, "vuelve a ser tuya")
+            )
+          ),
+          React.createElement('div', { className: "hidden lg:block text-sm space-y-1 mt-4" },
+            React.createElement('p', { className: "text-white" }, React.createElement('span', { className: "text-gray-400 w-20 inline-block font-medium" }, "Artista:"), ` ${artist.name}`),
+            React.createElement('p', { className: "text-white" }, React.createElement('span', { className: "text-gray-400 w-20 inline-block font-medium" }, "Álbum:"), ` ${artist.albumName}`),
+            React.createElement('p', { className: "text-white" }, React.createElement('span', { className: "text-gray-400 w-20 inline-block font-medium" }, "Año:"), ` ${artist.releaseYear}`)
+          )
+        );
+      };
+      // --- END OF components/AlbumInfo.tsx ---
+
+      // --- START OF components/ArtistInfo.tsx ---
+      const ArtistInfo = ({ artist, currentTrack, isPlaying }) => {
+        const [showShareOptions, setShowShareOptions] = useState(false);
+        const shareContainerRef = useRef(null);
+        const shareUrl = "https://sites.google.com/view/desmuda/nohemi";
+
+        const handleShareClick = () => {
+          setShowShareOptions(prev => !prev);
+        };
+
+        useEffect(() => {
+          const handleClickOutside = (event) => {
+            if (shareContainerRef.current && !shareContainerRef.current.contains(event.target)) {
+              setShowShareOptions(false);
+            }
+          };
+          document.addEventListener('mousedown', handleClickOutside);
+          return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+          };
+        }, []);
+
+        let albumArtUrl = artist.avatarUrl;
+
+        return React.createElement('div', { className: "flex flex-col items-center text-center lg:items-start lg:text-left" },
+          React.createElement('img', {
+            src: albumArtUrl,
+            alt: artist.name,
+            className: "w-48 h-48 lg:w-full lg:h-auto object-cover aspect-square mb-4 shadow-lg rounded-md"
+          }),
+          React.createElement(AlbumInfo, { artist: artist, currentTrack: currentTrack, isPlaying: isPlaying }),
+          React.createElement('div', { className: "flex items-center justify-center lg:justify-start gap-4 mt-4 w-full max-w-xs lg:max-w-full" },
+            React.createElement('a', { href: "https://sites.google.com/view/formatog/inicio", target: "_blank", rel: "noopener noreferrer", 'aria-label': "Visit Formato G", className: "bg-zinc-800 p-3 rounded-md hover:bg-zinc-700 transition-colors duration-200" },
+              React.createElement('img', { src: "https://ia801406.us.archive.org/6/items/logo-blanco-favicom-02/logo%20blanco%20favicom-02.png", alt: "Formato G Logo", className: "w-6 h-6 object-contain" })
+            ),
+            React.createElement('div', { className: "relative", ref: shareContainerRef },
+              React.createElement('button', { onClick: handleShareClick, 'aria-label': "Share", className: "bg-zinc-800 p-3 rounded-md hover:bg-zinc-700 transition-colors duration-200" },
+                React.createElement(Icon, { name: "share", className: "w-6 h-6 text-white" })
+              ),
+              showShareOptions && React.createElement('div', { className: "absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 p-2 bg-zinc-900/80 backdrop-blur-sm rounded-lg shadow-lg z-20 animate-fade-in-up" },
+                React.createElement('div', { className: "relative group" },
+                  React.createElement('a', { href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, target: "_blank", rel: "noopener noreferrer", 'aria-label': "Share on Facebook", className: "bg-zinc-800 p-3 rounded-md hover:bg-zinc-700 transition-colors duration-200 block" },
+                    React.createElement(Icon, { name: "facebook", className: "w-6 h-6 text-white" })
+                  ),
+                  React.createElement('span', { className: "absolute left-full top-1/2 -translate-y-1/2 ml-3 whitespace-nowrap bg-black text-white text-xs font-bold py-1 px-2 rounded-md pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300" },
+                    "Compartir en Facebook"
+                  )
+                ),
+                React.createElement('div', { className: "relative group" },
+                  React.createElement('a', { href: `whatsapp://send?text=${encodeURIComponent(shareUrl)}`, rel: "noopener noreferrer", 'aria-label': "Share on Whatsapp", className: "bg-zinc-800 p-3 rounded-md hover:bg-zinc-700 transition-colors duration-200 block" },
+                    React.createElement(Icon, { name: "whatsapp", className: "w-6 h-6 text-white" })
+                  ),
+                  React.createElement('span', { className: "absolute left-full top-1/2 -translate-y-1/2 ml-3 whitespace-nowrap bg-black text-white text-xs font-bold py-1 px-2 rounded-md pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300" },
+                    "Compartir por Whatsapp"
+                  )
+                )
+              )
+            ),
+            React.createElement('a', { href: "https://www.instagram.com/", target: "_blank", rel: "noopener noreferrer", 'aria-label': "Visit Instagram", className: "bg-zinc-800 p-3 rounded-md hover:bg-zinc-700 transition-colors duration-200" },
+              React.createElement(Icon, { name: "instagram", className: "w-6 h-6 text-white" })
+            ),
+            React.createElement('a', { href: "https://www.youtube.com/", target: "_blank", rel: "noopener noreferrer", 'aria-label': "Visit YouTube", className: "bg-zinc-800 p-3 rounded-md hover:bg-zinc-700 transition-colors duration-200" },
+              React.createElement(Icon, { name: "youtube", className: "w-6 h-6 text-white" })
+            )
+          )
+        );
+      };
+      // --- END OF components/ArtistInfo.tsx ---
+
+      // --- START OF components/TrackItem.tsx ---
+      const TrackItem = ({ track, index, isCurrent, isPlaying, onTrackSelect }) => {
+        const isAvailable = track.available;
+        const baseClasses = "flex items-center gap-4 p-2 rounded-md transition-colors duration-200 cursor-pointer";
+        const stateClasses = isCurrent ? "bg-zinc-700" : (isAvailable ? "hover:bg-zinc-800" : "opacity-50 cursor-not-allowed");
+        const textClass = isCurrent ? "text-green-400" : "text-white";
+
+        return React.createElement('li', { className: `${baseClasses} ${stateClasses}`, onClick: () => isAvailable && onTrackSelect(track) },
+          React.createElement('div', { className: "w-6 text-right text-gray-400 flex items-center justify-center" },
+            isCurrent && isPlaying ?
+              React.createElement(Icon, { name: "volume", className: "w-4 h-4 text-green-400 animate-pulse" }) :
+              React.createElement('span', { className: textClass }, index + 1)
+          ),
+          React.createElement('img', { src: track.albumArt, alt: track.title, className: "w-10 h-10 rounded-sm" }),
+          React.createElement('div', { className: "flex-1 min-w-0" },
+            React.createElement('p', { className: `${textClass} truncate` }, track.title),
+            track.featuring && React.createElement('p', { className: "text-xs text-gray-400 truncate" }, `(con ${track.featuring})`)
+          ),
+          !isAvailable && React.createElement('div', { className: "flex items-center gap-2 text-sm text-gray-500 ml-auto pl-2" },
+            React.createElement(Icon, { name: "location", className: "w-4 h-4" }),
+            React.createElement('span', null, "No disponible")
+          )
+        );
+      };
+      // --- END OF components/TrackItem.tsx ---
+
+      // --- START OF components/TrackList.tsx ---
+      const TrackList = ({ tracks, currentTrackId, isPlaying, onTrackSelect }) => {
+        return React.createElement('ul', { className: "space-y-1" },
+          tracks.map((track, index) => React.createElement(TrackItem, {
+            key: track.id,
+            track: track,
+            index: index,
+            isCurrent: track.id === currentTrackId,
+            isPlaying: track.id === currentTrackId && isPlaying,
+            onTrackSelect: onTrackSelect,
+          }))
+        );
+      };
+      // --- END OF components/TrackList.tsx ---
+
+      // --- START OF components/PlayerControls.tsx ---
+      const formatTime = (timeInSeconds) => {
+          if (isNaN(timeInSeconds) || timeInSeconds === 0) return '0:00';
+          const seconds = Math.floor(timeInSeconds);
+          const minutes = Math.floor(seconds / 60);
+          const remainingSeconds = seconds % 60;
+          return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+      };
+      const PlayerControls = ({ currentTrack, isPlaying, onPlayPause, onNext, onPrev, onStop, progress, onSeek, volume, onVolumeChange }) => {
+        return React.createElement('footer', {
+            className: "fixed bottom-0 left-0 right-0 bg-[#181818] border-t border-zinc-800 text-white flex items-center justify-between md:px-4 z-50",
+            style: {
+                height: `calc(6rem + env(safe-area-inset-bottom))`,
+                paddingBottom: `env(safe-area-inset-bottom)`
+            }
+          },
+          React.createElement('div', { className: "hidden md:flex items-center gap-4 w-1/4" },
+            currentTrack && isPlaying ? React.createElement(React.Fragment, null,
+              React.createElement('img', { src: currentTrack.albumArt, alt: currentTrack.title, className: "w-14 h-14 rounded-md" }),
+              React.createElement('div', null,
+                React.createElement('p', { className: "font-semibold" }, currentTrack.title),
+                React.createElement('p', { className: "text-sm text-gray-400" }, currentTrack.artist)
+              )
+            ) : React.createElement('div', { className: "text-gray-400 italic text-sm" },
+              React.createElement('p', null, "La música"),
+              React.createElement('p', null, "vuelve a ser tuya")
+            )
+          ),
+          React.createElement('div', { className: "flex flex-col items-center justify-center gap-2 flex-grow w-full md:w-auto" },
+            React.createElement('div', { className: "flex items-center justify-around md:justify-center w-full px-4 md:px-0 md:gap-6" },
+              React.createElement('button', { onClick: onPrev, className: "text-gray-400 hover:text-white transition-colors", 'aria-label': "Previous" },
+                React.createElement(Icon, { name: "previous", className: "w-6 h-6" })
+              ),
+              React.createElement('button', { onClick: onPlayPause, className: "bg-white text-black rounded-full p-3 flex items-center justify-center hover:scale-105 transition-transform", 'aria-label': isPlaying ? 'Pause' : 'Play' },
+                React.createElement(Icon, { name: isPlaying ? 'pause' : 'play', className: "w-6 h-6" })
+              ),
+              React.createElement('button', { onClick: onNext, className: "text-gray-400 hover:text-white transition-colors", 'aria-label': "Next" },
+                React.createElement(Icon, { name: "next", className: "w-6 h-6" })
+              ),
+              React.createElement('button', { onClick: onStop, className: "hidden md:flex text-gray-400 hover:text-white transition-colors", 'aria-label': "Stop" },
+                React.createElement(Icon, { name: "stop", className: "w-5 h-5" })
+              ),
+              React.createElement('button', { className: "hidden md:block text-gray-400 hover:text-white transition-colors", 'aria-label': "Repeat" },
+                React.createElement(Icon, { name: "repeat", className: "w-5 h-5" })
+              )
+            ),
+            React.createElement('div', { className: "flex items-center gap-2 w-full md:max-w-lg px-0 md:px-0" },
+              React.createElement('span', { className: "text-xs text-gray-400 w-10 text-center px-2" }, formatTime(progress.currentTime)),
+              React.createElement('input', { type: "range", value: progress.currentTime, max: progress.duration || 0, onChange: onSeek, className: "w-full h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer range-sm accent-white hover:accent-green-500", 'aria-label': "track progress" }),
+              React.createElement('span', { className: "text-xs text-gray-400 w-10 text-center px-2" }, formatTime(progress.duration))
+            )
+          ),
+          React.createElement('div', { className: "hidden md:flex items-center justify-end gap-2 w-1/4" },
+            React.createElement(Icon, { name: "volume", className: "w-5 h-5 text-gray-400" }),
+            React.createElement('input', { type: "range", min: "0", max: "1", step: "0.01", value: volume, onChange: onVolumeChange, className: "w-24 h-1 bg-zinc-600 rounded-lg appearance-none cursor-pointer range-sm accent-white hover:accent-green-500", 'aria-label': "volume control" })
+          )
+        );
+      };
+      // --- END OF components/PlayerControls.tsx ---
+      
+      // --- START OF components/BioContent.tsx ---
+      const BioContent = ({ bio, imageUrl }) => {
+        if (!bio) {
+          return React.createElement('p', { className: "text-gray-400" }, "No hay biografía disponible.");
+        }
+        return React.createElement('div', { className: "flex flex-col md:flex-row gap-8 items-start animate-fade-in-up", style: { animationDuration: '0.3s' } },
+          imageUrl && React.createElement('div', { className: "flex-shrink-0 w-full md:w-1/3 md:order-last" },
+            React.createElement('img', {
+              src: imageUrl,
+              alt: "Biografía",
+              className: "w-full h-auto object-cover rounded-lg shadow-lg aspect-square"
+            })
+          ),
+          React.createElement('div', { className: "text-gray-300 leading-relaxed space-y-4 flex-1" },
+            React.createElement('p', { className: "whitespace-pre-line" }, bio)
+          )
+        );
+      };
+      // --- END OF components/BioContent.tsx ---
+
+      // --- START OF components/ContactContent.tsx ---
+      const ContactContent = ({ info }) => {
+        if (!info || (!info.email && !info.phone)) {
+          return React.createElement('p', { className: "text-gray-400" }, "No hay información de contacto disponible.");
+        }
+        return React.createElement('div', { className: "text-gray-300 space-y-4 animate-fade-in-up", style: { animationDuration: '0.3s' } },
+          React.createElement('ul', { className: "space-y-3" },
+            info.email && React.createElement('li', null,
+              React.createElement('a', { href: `mailto:${info.email}`, className: "flex items-center gap-4 group transition-colors hover:text-white" },
+                React.createElement(Icon, { name: "mail", className: "w-6 h-6 text-gray-400 group-hover:text-green-400 transition-colors" }),
+                React.createElement('span', { className: "font-medium" }, info.email)
+              )
+            ),
+            info.phone && React.createElement('li', null,
+              React.createElement('a', { href: `tel:${info.phone.replace(/\s|-/g, '')}`, className: "flex items-center gap-4 group transition-colors hover:text-white" },
+                React.createElement(Icon, { name: "whatsapp", className: "w-6 h-6 text-gray-400 group-hover:text-green-400 transition-colors" }),
+                React.createElement('span', { className: "font-medium" }, info.phone)
+              )
+            )
+          )
+        );
+      };
+      // --- END OF components/ContactContent.tsx ---
+
+      // --- START OF components/SupportContent.tsx ---
+      const SupportContent = ({ info }) => {
+        if (!info || !info.link) {
+          return React.createElement('p', { className: "text-gray-400" }, "No hay información de apoyo disponible.");
+        }
+        return React.createElement('div', { className: "text-gray-300 space-y-6 flex flex-col items-center text-center animate-fade-in-up", style: { animationDuration: '0.3s' } },
+          React.createElement('p', { className: "max-w-md text-sm" }, info.text || 'Si te gusta esta música, puedes apoyar al artista con una contribución.'),
+          info.qrCodeUrl && React.createElement('div', { className: "p-2 bg-white rounded-lg shadow-lg" },
+            React.createElement('img', { src: info.qrCodeUrl, alt: "Código QR para apoyar", className: "w-48 h-48" })
+          ),
+          React.createElement('a', {
+            href: info.link,
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: "inline-flex items-center gap-3 bg-green-500 text-black font-bold py-3 px-6 rounded-full hover:bg-green-400 transition-all duration-300 transform hover:scale-105 shadow-lg"
+          },
+            React.createElement(Icon, { name: "heart", className: "w-5 h-5" }),
+            "Apoyar con un Cafecito"
+          )
+        );
+      };
+      // --- END OF components/SupportContent.tsx ---
+
+      // --- START OF components/ContentTabs.tsx ---
+      const ContentTabs = ({ activeTab, onTabClick }) => {
+        const tabs = [
+          { id: 'songs', label: 'Canciones' },
+          { id: 'bio', label: 'Biografía', disabled: true },
+          { id: 'contact', label: 'Contacto', disabled: true },
+          { id: 'support', label: 'Apoyar', disabled: true },
+        ];
+        return React.createElement('div', { className: "flex-shrink-0 border-b border-zinc-800 bg-zinc-900 sticky top-0 z-10" },
+          React.createElement('nav', { className: "flex space-x-2 px-4", 'aria-label': "Tabs" },
+            tabs.map((tab) => React.createElement('button', {
+              key: tab.id,
+              onClick: () => !tab.disabled && onTabClick(tab.id),
+              disabled: tab.disabled,
+              className: `
+                py-3 px-3 text-sm font-medium transition-colors duration-200 whitespace-nowrap
+                ${activeTab === tab.id ? 'border-b-2 border-green-400 text-white' : 'border-b-2 border-transparent text-gray-400'}
+                ${tab.disabled ? 'opacity-50 cursor-default' : 'hover:text-white hover:border-gray-500'}
+              `,
+              'aria-current': activeTab === tab.id ? 'page' : undefined,
+              title: tab.disabled ? 'Próximamente' : ''
+            }, tab.label))
+          )
+        );
+      };
+      // --- END OF components/ContentTabs.tsx ---
+
+      // --- START OF App.tsx ---
+      const App = () => {
+        const [currentTrack, setCurrentTrack] = useState(null);
+        const [isPlaying, setIsPlaying] = useState(false);
+        const [progress, setProgress] = useState({ currentTime: 0, duration: 0 });
+        const [volume, setVolume] = useState(1);
+        const [offlineTrackIds, setOfflineTrackIds] = useState(new Set());
+        const [activeTab, setActiveTab] = useState('songs');
+        const audioRef = useRef(null);
+
+        useEffect(() => {
+          setOfflineTrackIds(getOfflineTrackIds());
+        }, []);
+
+        const handleTrackSelect = useCallback((track) => {
+          if (track.available) {
+            if (currentTrack?.id === track.id) {
+               setIsPlaying(prev => !prev);
+            } else {
+              setCurrentTrack(track);
+              setIsPlaying(true);
+            }
+          }
+        }, [currentTrack]);
+
+        const handleNext = useCallback(() => {
+          const availableTracks = TRACK_DATA.filter(t => t.available);
+          if (!currentTrack || availableTracks.length === 0) return;
+          
+          const currentIndex = availableTracks.findIndex(t => t.id === currentTrack.id);
+          const nextIndex = (currentIndex + 1) % availableTracks.length;
+          setCurrentTrack(availableTracks[nextIndex]);
+          setIsPlaying(true);
+        }, [currentTrack]);
+
+        const handlePlayPause = useCallback(() => {
+          if (currentTrack) {
+            setIsPlaying(prev => !prev);
+          } else {
+            const firstAvailableTrack = TRACK_DATA.find(t => t.available);
+            if (firstAvailableTrack) {
+              handleTrackSelect(firstAvailableTrack);
+            }
+          }
+        }, [currentTrack, handleTrackSelect]);
+
+        const handlePrev = useCallback(() => {
+          const availableTracks = TRACK_DATA.filter(t => t.available);
+          if (!currentTrack || availableTracks.length === 0) return;
+
+          const currentIndex = availableTracks.findIndex(t => t.id === currentTrack.id);
+          const prevIndex = (currentIndex - 1 + availableTracks.length) % availableTracks.length;
+          setCurrentTrack(availableTracks[prevIndex]);
+          setIsPlaying(true);
+        }, [currentTrack]);
+
+        const handleStop = useCallback(() => {
+          setIsPlaying(false);
+          setCurrentTrack(null);
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+        }, []);
+        
+        useEffect(() => {
+            const audio = audioRef.current;
+            if (!audio) return;
+
+            let objectUrl = null;
+
+            const setupAudio = async () => {
+                if (audio.src.startsWith('blob:')) {
+                    URL.revokeObjectURL(audio.src);
+                }
+
+                if (currentTrack?.audioSrc) {
+                    const offlineResponse = await getOfflineAudio(currentTrack.audioSrc);
+                    let srcToPlay;
+
+                    if (offlineResponse) {
+                        const blob = await offlineResponse.blob();
+                        objectUrl = URL.createObjectURL(blob);
+                        srcToPlay = objectUrl;
+                    } else {
+                        srcToPlay = currentTrack.audioSrc;
+                        if (isPlaying && !offlineTrackIds.has(currentTrack.id)) {
+                            saveTrackForOffline(currentTrack)
+                                .then(() => {
+                                    setOfflineTrackIds(prev => new Set(prev).add(currentTrack.id));
+                                })
+                                .catch(error => {
+                                    console.error(`Failed to save track ${currentTrack.id} for offline use:`, error);
+                                });
+                        }
+                    }
+
+                    if (audio.src !== srcToPlay) {
+                        audio.src = srcToPlay;
+                    }
+
+                    if (isPlaying) {
+                        try {
+                            await audio.play();
+                        } catch (e) {
+                            console.error("Error playing audio:", e);
+                            setIsPlaying(false);
+                        }
+                    } else {
+                        audio.pause();
+                    }
+                } else {
+                    audio.pause();
+                    audio.src = '';
+                }
+            };
+
+            setupAudio();
+
+            return () => {
+                if (objectUrl) {
+                    URL.revokeObjectURL(objectUrl);
+                }
+            };
+        }, [currentTrack, isPlaying, offlineTrackIds]);
+
+        useEffect(() => {
+          const audioElement = audioRef.current;
+          const handleTimeUpdate = () => {
+            if (audioElement) {
+              setProgress({
+                currentTime: audioElement.currentTime,
+                duration: audioElement.duration || 0,
+              });
+            }
+          };
+          const handleTrackEnd = () => handleNext();
+          
+          if (audioElement) {
+            audioElement.addEventListener('timeupdate', handleTimeUpdate);
+            audioElement.addEventListener('loadedmetadata', handleTimeUpdate);
+            audioElement.addEventListener('ended', handleTrackEnd);
+            return () => {
+              audioElement.removeEventListener('timeupdate', handleTimeUpdate);
+              audioElement.removeEventListener('loadedmetadata', handleTimeUpdate);
+              audioElement.removeEventListener('ended', handleTrackEnd);
+            };
+          }
+        }, [handleNext]);
+
+        const handleSeek = (e) => {
+          if (audioRef.current) {
+              audioRef.current.currentTime = Number(e.target.value);
+          }
+        };
+
+        const handleVolumeChange = (e) => {
+          const newVolume = Number(e.target.value);
+          setVolume(newVolume);
+        };
+
+        useEffect(() => {
+          if (audioRef.current) {
+            audioRef.current.volume = volume;
+          }
+        }, [volume]);
+
+        const renderTabContent = (tab) => {
+          switch(tab) {
+            case 'bio':
+              return React.createElement(BioContent, { bio: ARTIST_DATA.bio, imageUrl: ARTIST_DATA.bioImageUrl || ARTIST_DATA.avatarUrl });
+            case 'contact':
+              return React.createElement(ContactContent, { info: ARTIST_DATA.contact });
+            case 'support':
+              return React.createElement(SupportContent, { info: ARTIST_DATA.support });
+            case 'songs':
+            default:
+              return React.createElement(TrackList, {
+                tracks: TRACK_DATA,
+                currentTrackId: currentTrack?.id,
+                isPlaying: isPlaying,
+                onTrackSelect: handleTrackSelect,
+              });
+          }
+        };
+
+        const FullScreenContentOverlay = () => {
+          if (activeTab === 'songs') return null;
+
+          const titleMap = {
+            bio: 'Biografía',
+            contact: 'Contacto',
+            support: 'Apoyar'
+          };
+
+          return React.createElement('div', { className: "lg:hidden fixed inset-0 bg-zinc-900 z-50 flex flex-col animate-fade-in-up" },
+            React.createElement('header', { 
+              className: "flex-shrink-0 flex items-center p-2 border-b border-zinc-800",
+              style: { paddingTop: `calc(0.5rem + env(safe-area-inset-top))` }
+            },
+              React.createElement('button', {
+                onClick: () => setActiveTab('songs'),
+                className: "p-2 rounded-full hover:bg-zinc-800 transition-colors",
+                'aria-label': "Volver"
+              },
+                React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-6 w-6 text-white", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+                  React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M15 19l-7-7 7-7" })
+                )
+              ),
+              React.createElement('h2', { className: "text-lg font-semibold text-white text-center flex-1 pr-10" },
+                titleMap[activeTab]
+              )
+            ),
+            React.createElement('div', { 
+              className: "flex-1 overflow-y-auto p-6",
+              style: { paddingBottom: `calc(7.5rem + env(safe-area-inset-bottom))` }
+            },
+              renderTabContent(activeTab)
+            )
+          );
+        };
+
+        return React.createElement('div', { className: "bg-[#121212] text-gray-300 font-sans h-dvh flex flex-col" },
+          React.createElement('main', { className: "flex-1 flex flex-col lg:flex-row gap-8 p-4 lg:p-8 overflow-hidden" },
+            React.createElement('aside', { className: "w-full lg:w-1/4 lg:max-w-xs flex-shrink-0 lg:overflow-y-auto hide-scrollbar" },
+              React.createElement(ArtistInfo, {
+                artist: ARTIST_DATA,
+                currentTrack: currentTrack,
+                isPlaying: isPlaying,
+              })
+            ),
+            React.createElement('div', { className: "flex-1 flex flex-col min-h-0 bg-zinc-900 rounded-lg relative overflow-hidden" },
+              React.createElement(DesktopHeader, {
+                artist: ARTIST_DATA,
+                currentTrack: currentTrack,
+                isPlaying: isPlaying,
+              }),
+              React.createElement(ContentTabs, { activeTab: activeTab, onTabClick: setActiveTab }),
+              React.createElement('div', { className: "flex-1 overflow-y-auto p-6 thin-scrollbar" },
+                React.createElement('div', { className: "hidden lg:block" },
+                  renderTabContent(activeTab)
+                ),
+                React.createElement('div', { className: "lg:hidden" },
+                  renderTabContent('songs')
+                )
+              )
+            )
+          ),
+          React.createElement(FullScreenContentOverlay, null),
+          React.createElement('div', { className: "flex-shrink-0", style: { height: `calc(6rem + env(safe-area-inset-bottom))` } }),
+          React.createElement('audio', { ref: audioRef, preload: "metadata", crossOrigin: "anonymous" }),
+          React.createElement(PlayerControls, {
+            currentTrack: currentTrack,
+            isPlaying: isPlaying,
+            onPlayPause: handlePlayPause,
+            onNext: handleNext,
+            onPrev: handlePrev,
+            onStop: handleStop,
+            progress: progress,
+            onSeek: handleSeek,
+            volume: volume,
+            onVolumeChange: handleVolumeChange,
+          })
+        );
+      };
+      // --- END OF App.tsx ---
+
+      // --- START OF index.tsx ---
+      const rootElement = document.getElementById('root');
+      if (!rootElement) {
+        throw new Error("Could not find root element to mount to");
+      }
+      const root = ReactDOM.createRoot(rootElement);
+      root.render(
+        React.createElement(React.StrictMode, null, 
+          React.createElement(App, null)
+        )
+      );
+      // --- END OF index.tsx ---
+    </script>
 </body>
 </html>
